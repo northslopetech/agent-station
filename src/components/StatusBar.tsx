@@ -1,11 +1,14 @@
 import { useAppStore } from '../stores/appStore';
+import type { TasksMdTask } from '../types';
+
+const EMPTY_TASKS: TasksMdTask[] = [];
 
 interface StatusBarProps {
   projectId: string;
 }
 
 export function StatusBar({ projectId }: StatusBarProps) {
-  const tasks = useAppStore((s) => s.tasksMdTasks[projectId] ?? []);
+  const tasks = useAppStore((s) => s.tasksMdTasks[projectId]) ?? EMPTY_TASKS;
   const total = tasks.length;
   const done = tasks.filter((t) => t.completed).length;
   const pct = total > 0 ? (done / total) * 100 : 0;
