@@ -3,6 +3,9 @@ import { ProjectList } from "./components/ProjectList";
 import { FileTree } from "./components/FileTree";
 import { EditorPane } from "./components/EditorPane";
 import { TerminalPane } from "./components/TerminalPane";
+import { StatusBar } from "./components/StatusBar";
+import { useTasksMdWatcher } from "./hooks/useTasksMdWatcher";
+import { useAppStore } from "./stores/appStore";
 import "./App.css";
 
 function ResizeHandle() {
@@ -20,11 +23,16 @@ function App() {
     storage: localStorage,
   });
 
+  // Watch TASKS.md for changes
+  useTasksMdWatcher();
+
+  const selectedProjectId = useAppStore((s) => s.selectedProjectId);
+
   return (
-    <div className="h-screen w-screen bg-zinc-900">
+    <div className="h-screen w-screen bg-zinc-900 flex flex-col">
       <Group
         orientation="horizontal"
-        className="h-full"
+        className="flex-1 min-h-0"
         defaultLayout={defaultLayout}
         onLayoutChanged={onLayoutChanged}
       >
@@ -77,6 +85,9 @@ function App() {
           <TerminalPane />
         </Panel>
       </Group>
+
+      {/* Status Bar */}
+      {selectedProjectId && <StatusBar projectId={selectedProjectId} />}
     </div>
   );
 }

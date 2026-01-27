@@ -62,6 +62,11 @@ pub fn add_project(path: String, state: tauri::State<'_, crate::state::AppState>
         eprintln!("Failed to initialize task directory: {}", e);
     }
 
+    // Create TASKS.md if it doesn't exist
+    if let Err(e) = crate::commands::tasks::create_tasks_md(project.path.clone(), project.name.clone()) {
+        eprintln!("Failed to create TASKS.md: {}", e);
+    }
+
     Ok(project)
 }
 

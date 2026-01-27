@@ -1,6 +1,6 @@
 [package]
 name = "agent-station"
-version = "0.4.0"
+version = "0.5.1"
 description = "A desktop application for managing multiple Claude Code agents"
 authors = ["you"]
 edition = "2021"
@@ -29,4 +29,5 @@ dirs = "6"
 regex = "1"
 portable-pty = "0.9"
 tokio = { version = "1", features = ["sync", "io-util", "time"] }
+notify = "6.1"
 

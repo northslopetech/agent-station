@@ -5,12 +5,14 @@ import {
   Draggable,
   DropResult,
 } from '@hello-pangea/dnd';
+import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '../stores/appStore';
 import { TaskCard } from './TaskCard';
 import { AddTaskModal } from './AddTaskModal';
 import {
   mapClaudeTasksToKanban,
   mapHumanTasksToKanban,
+  mapTasksMdToKanban,
   groupTasksByColumn,
   COLUMN_CONFIG,
   COLUMN_ORDER,
@@ -28,23 +30,28 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
     moveTask,
     addHumanTask,
     deleteHumanTask,
+    tasksMdTasks,
+    projects,
   } = useAppStore();
 
   const [addingToColumn, setAddingToColumn] = useState<KanbanColumn | null>(null);
 
   const projectKanban = kanbanState[projectId] || { taskOverlays: {}, humanTasks: [] };
+  const projectTasksMd = tasksMdTasks[projectId] || [];
+  const project = projects.find((p) => p.id === projectId);
 
   // Map all tasks to Kanban format
   const allTasks = useMemo(() => {
     const claudeTasks = mapClaudeTasksToKanban(tasks, projectKanban.taskOverlays);
     const humanTasks = mapHumanTasksToKanban(projectKanban.humanTasks);
-    return [...claudeTasks, ...humanTasks];
-  }, [tasks, projectKanban.taskOverlays, projectKanban.humanTasks]);
+    const mdTasks = mapTasksMdToKanban(projectTasksMd);
+    return [...claudeTasks, ...humanTasks, ...mdTasks];
+  }, [tasks, projectKanban.taskOverlays, projectKanban.humanTasks, projectTasksMd]);
 
   // Group by column
   const columns = useMemo(() => groupTasksByColumn(allTasks), [allTasks]);
 
-  const handleDragEnd = (result: DropResult) => {
+  const handleDragEnd = async (result: DropResult) => {
     const { draggableId, destination } = result;
 
     if (!destination) return;
@@ -54,9 +61,26 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
 
     if (!task) return;
 
+    // Handle TASKS.md tasks
+    if (task.isTasksMdTask && project) {
+      // Extract the subject from the ID (format: tasksmd-{subject})
+      const taskSubject = task.subject;
+      try {
+        await invoke('move_task_in_tasks_md', {
+          projectPath: project.path,
+          taskSubject,
+          newColumn,
+        });
+        // The file watcher will update the state automatically
+      } catch (err) {
+        console.error('Failed to move TASKS.md task:', err);
+      }
+      return;
+    }
+
     // Don't allow moving Claude tasks out of their natural state in certain ways
     // For example, a completed task shouldn't be dragged back to backlog
-    if (!task.isHumanTask && task.originalStatus === 'completed' && newColumn !== 'done') {
+    if (!task.isHumanTask && !task.isTasksMdTask && task.originalStatus === 'completed' && newColumn !== 'done') {
       // Optionally show a warning, but for now just don't move
       return;
     }

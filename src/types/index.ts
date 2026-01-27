@@ -69,3 +69,13 @@ export interface KanbanState {
   taskOverlays: Record<string, TaskOverlay>;
   humanTasks: HumanTask[];
 }
+
+// TASKS.md task type
+export interface TasksMdTask {
+  id: string;
+  subject: string;
+  description?: string;
+  column: 'backlog' | 'in_progress' | 'review' | 'done';
+  completed: boolean;
+  lineNumber: number;
+}

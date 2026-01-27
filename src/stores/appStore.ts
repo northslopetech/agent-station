@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Project, FileNode, TaskProgress, ClaudeTaskProgress, KanbanColumn, TaskOverlay, HumanTask } from '../types';
+import type { Project, FileNode, TaskProgress, ClaudeTaskProgress, KanbanColumn, TaskOverlay, HumanTask, TasksMdTask } from '../types';
 
 interface AppState {
   // Projects
@@ -34,6 +34,9 @@ interface AppState {
   // Claude Code task progress per project
   claudeTaskProgress: Record<string, ClaudeTaskProgress>;
 
+  // TASKS.md tasks per project
+  tasksMdTasks: Record<string, TasksMdTask[]>;
+
   // Terminal state per project (projectId -> array of terminalIds)
   // Not persisted - terminals don't survive app restart
   terminalIds: Record<string, string[]>;
@@ -63,6 +66,7 @@ interface AppState {
 
   setTaskProgress: (projectId: string, progress: TaskProgress) => void;
   setClaudeTaskProgress: (projectId: string, progress: ClaudeTaskProgress) => void;
+  setTasksMdTasks: (projectId: string, tasks: TasksMdTask[]) => void;
 
   // Kanban actions
   setTaskViewMode: (mode: 'list' | 'board') => void;
@@ -89,6 +93,7 @@ export const useAppStore = create<AppState>()(
       kanbanState: {},
       taskProgress: {},
       claudeTaskProgress: {},
+      tasksMdTasks: {},
       terminalIds: {},
       terminalNames: {},
 
@@ -190,6 +195,14 @@ export const useAppStore = create<AppState>()(
           claudeTaskProgress: {
             ...state.claudeTaskProgress,
             [projectId]: progress,
+          },
+        })),
+
+      setTasksMdTasks: (projectId, tasks) =>
+        set((state) => ({
+          tasksMdTasks: {
+            ...state.tasksMdTasks,
+            [projectId]: tasks,
           },
         })),
 

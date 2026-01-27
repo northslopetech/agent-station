@@ -1,4 +1,4 @@
-import type { ClaudeTask, KanbanColumn, TaskOverlay, HumanTask } from '../types';
+import type { ClaudeTask, KanbanColumn, TaskOverlay, HumanTask, TasksMdTask } from '../types';
 
 export interface KanbanTask {
   id: string;
@@ -6,6 +6,7 @@ export interface KanbanTask {
   description?: string;
   column: KanbanColumn;
   isHumanTask: boolean;
+  isTasksMdTask?: boolean;
   assignee?: 'human' | 'agent';
   blockedBy?: string[];
   blocks?: string[];
@@ -67,6 +68,21 @@ export function mapHumanTasksToKanban(tasks: HumanTask[]): KanbanTask[] {
     column: task.column,
     isHumanTask: true,
     assignee: task.assignee,
+  }));
+}
+
+/**
+ * Maps TASKS.md tasks to Kanban tasks
+ */
+export function mapTasksMdToKanban(tasks: TasksMdTask[]): KanbanTask[] {
+  return tasks.map((task) => ({
+    id: `tasksmd-${task.subject}`, // Use subject as part of ID since task.id is ephemeral
+    subject: task.subject,
+    description: task.description,
+    column: task.column as KanbanColumn,
+    isHumanTask: false,
+    isTasksMdTask: true,
+    assignee: 'human', // TASKS.md tasks are human tasks by default
   }));
 }
 

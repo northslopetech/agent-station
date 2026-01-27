@@ -11,6 +11,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .manage(state::AppState::new())
         .manage(terminal::TerminalManager::new())
+        .manage(tasks::TasksWatcherState::new())
         .invoke_handler(tauri::generate_handler![
             // Project commands
             projects::get_projects,
@@ -28,6 +29,13 @@ pub fn run() {
             // Task commands
             tasks::get_task_progress,
             tasks::get_claude_task_progress,
+            // TASKS.md commands
+            tasks::read_tasks_md,
+            tasks::write_tasks_md,
+            tasks::create_tasks_md,
+            tasks::move_task_in_tasks_md,
+            tasks::watch_tasks_md,
+            tasks::unwatch_tasks_md,
             // Terminal commands
             terminal::spawn_terminal,
             terminal::write_terminal,
