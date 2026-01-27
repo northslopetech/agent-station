@@ -58,7 +58,15 @@ function SortableProjectItem({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const hasClaudeTasks = claudeProgress && claudeProgress.total > 0;
+  // Combine TASKS.md progress + Claude progress
+  const mdTotal = progress?.total || 0;
+  const mdCompleted = progress?.completed || 0;
+  const claudeTotal = claudeProgress?.total || 0;
+  const claudeCompleted = claudeProgress?.completed || 0;
+  const combinedTotal = mdTotal + claudeTotal;
+  const combinedCompleted = mdCompleted + claudeCompleted;
+  const combinedPercentage = combinedTotal > 0 ? (combinedCompleted / combinedTotal) * 100 : 0;
+  const hasAnyTasks = combinedTotal > 0;
 
   return (
     <li
@@ -80,8 +88,8 @@ function SortableProjectItem({
         <span className="text-sm truncate flex-1">{project.name}</span>
       </div>
 
-      {/* Claude Code Task Progress - clickable to show in editor */}
-      {hasClaudeTasks && (
+      {/* Combined Task Progress (TASKS.md + Claude tasks) */}
+      {hasAnyTasks && (
         <div
           className={`mt-1.5 cursor-pointer rounded p-1 -mx-1 transition-colors ${
             isShowingTasks ? "bg-zinc-600" : "hover:bg-zinc-600/50"
@@ -91,16 +99,16 @@ function SortableProjectItem({
         >
           <div className="h-1.5 bg-zinc-700 rounded-full overflow-hidden">
             <div
-              className={`h-full ${getProgressColor(claudeProgress.percentage)} transition-all duration-300`}
-              style={{ width: `${claudeProgress.percentage}%` }}
+              className={`h-full ${getProgressColor(combinedPercentage)} transition-all duration-300`}
+              style={{ width: `${combinedPercentage}%` }}
             />
           </div>
           <div className="text-[10px] text-zinc-500 mt-0.5 flex items-center gap-2">
-            <span>{Math.round(claudeProgress.percentage)}%</span>
+            <span>{Math.round(combinedPercentage)}%</span>
             <span>
-              ({claudeProgress.completed}/{claudeProgress.total})
+              ({combinedCompleted}/{combinedTotal})
             </span>
-            {claudeProgress.inProgress > 0 && (
+            {claudeProgress && claudeProgress.inProgress > 0 && (
               <span className="text-blue-400">
                 {claudeProgress.inProgress} active
               </span>
@@ -109,21 +117,6 @@ function SortableProjectItem({
         </div>
       )}
 
-      {/* Fallback to markdown task progress if no Claude tasks */}
-      {!hasClaudeTasks && progress && progress.total > 0 && (
-        <div className="mt-1.5">
-          <div className="h-1.5 bg-zinc-700 rounded-full overflow-hidden">
-            <div
-              className={`h-full ${getProgressColor(progress.percentage)} transition-all duration-300`}
-              style={{ width: `${progress.percentage}%` }}
-            />
-          </div>
-          <div className="text-[10px] text-zinc-500 mt-0.5">
-            {Math.round(progress.percentage)}% ({progress.completed}/
-            {progress.total})
-          </div>
-        </div>
-      )}
     </li>
   );
 }
@@ -137,8 +130,7 @@ export function ProjectList() {
     removeProject,
     reorderProjects,
     selectProject,
-    taskProgress,
-    setTaskProgress,
+    tasksMdTasks,
     claudeTaskProgress,
     setClaudeTaskProgress,
     editorViewMode,
@@ -177,25 +169,6 @@ export function ProjectList() {
     }
     loadProjects();
   }, [setProjects]);
-
-  // Fetch markdown task progress for all projects
-  useEffect(() => {
-    async function fetchTaskProgress() {
-      for (const project of projects) {
-        try {
-          const progress = await invoke<TaskProgress>("get_task_progress", {
-            projectPath: project.path,
-          });
-          setTaskProgress(project.id, progress);
-        } catch (error) {
-          console.error(`Failed to get task progress for ${project.name}:`, error);
-        }
-      }
-    }
-    if (projects.length > 0) {
-      fetchTaskProgress();
-    }
-  }, [projects, setTaskProgress]);
 
   // Poll Claude Code task progress every 3 seconds
   useEffect(() => {
@@ -341,7 +314,15 @@ export function ProjectList() {
             >
               <ul className="py-1">
                 {projects.map((project) => {
-                  const progress = taskProgress[project.id];
+                  // Calculate progress from TASKS.md tasks
+                  const mdTasks = tasksMdTasks[project.id] || [];
+                  const total = mdTasks.length;
+                  const completed = mdTasks.filter((t) => t.completed).length;
+                  const progress = total > 0 ? {
+                    total,
+                    completed,
+                    percentage: (completed / total) * 100,
+                  } : undefined;
                   const claudeProgress = claudeTaskProgress[project.id];
                   const isShowingTasks =
                     selectedProjectId === project.id && editorViewMode === "tasks";

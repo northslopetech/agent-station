@@ -4,9 +4,10 @@ interface TaskCardProps {
   task: KanbanTask;
   isDragging?: boolean;
   onDelete?: () => void;
+  onEdit?: () => void;
 }
 
-export function TaskCard({ task, isDragging, onDelete }: TaskCardProps) {
+export function TaskCard({ task, isDragging, onDelete, onEdit }: TaskCardProps) {
   const isCompleted = task.column === 'done';
   const isBlocked = task.column === 'blocked';
   const isInProgress = task.column === 'in_progress';
@@ -93,20 +94,40 @@ export function TaskCard({ task, isDragging, onDelete }: TaskCardProps) {
           </div>
         </div>
 
-        {/* Delete button for human tasks */}
-        {task.isHumanTask && onDelete && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="text-zinc-500 hover:text-red-400 p-0.5"
-            title="Delete task"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+        {/* Action buttons for editable tasks (human tasks or TASKS.md tasks) */}
+        {(task.isHumanTask || task.isTasksMdTask) && (onEdit || onDelete) && (
+          <div className="flex flex-col gap-0.5">
+            {/* Edit button */}
+            {onEdit && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+                className="text-zinc-500 hover:text-blue-400 p-0.5"
+                title="Edit task"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+              </button>
+            )}
+            {/* Delete button */}
+            {onDelete && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="text-zinc-500 hover:text-red-400 p-0.5"
+                title="Delete task"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

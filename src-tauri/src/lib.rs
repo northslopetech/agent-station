@@ -34,6 +34,9 @@ pub fn run() {
             tasks::write_tasks_md,
             tasks::create_tasks_md,
             tasks::move_task_in_tasks_md,
+            tasks::add_task_to_tasks_md,
+            tasks::update_task_in_tasks_md,
+            tasks::delete_task_from_tasks_md,
             tasks::watch_tasks_md,
             tasks::unwatch_tasks_md,
             // Terminal commands

@@ -9,6 +9,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '../stores/appStore';
 import { TaskCard } from './TaskCard';
 import { AddTaskModal } from './AddTaskModal';
+import { EditTaskModal } from './EditTaskModal';
+import { useTasksMdOperations } from '../hooks/useTasksMdOperations';
 import {
   mapClaudeTasksToKanban,
   mapHumanTasksToKanban,
@@ -16,6 +18,7 @@ import {
   groupTasksByColumn,
   COLUMN_CONFIG,
   COLUMN_ORDER,
+  KanbanTask,
 } from '../utils/kanbanMapper';
 import type { KanbanColumn, ClaudeTask, HumanTask } from '../types';
 
@@ -35,10 +38,14 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
   } = useAppStore();
 
   const [addingToColumn, setAddingToColumn] = useState<KanbanColumn | null>(null);
+  const [editingTask, setEditingTask] = useState<KanbanTask | null>(null);
 
   const projectKanban = kanbanState[projectId] || { taskOverlays: {}, humanTasks: [] };
   const projectTasksMd = tasksMdTasks[projectId] || [];
   const project = projects.find((p) => p.id === projectId);
+
+  // TASKS.md operations
+  const { addTask, updateTask, deleteTask } = useTasksMdOperations(project?.path);
 
   // Map all tasks to Kanban format
   const allTasks = useMemo(() => {
@@ -88,13 +95,46 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
     moveTask(projectId, draggableId, newColumn, task.isHumanTask);
   };
 
-  const handleAddTask = (task: Omit<HumanTask, 'id' | 'createdAt'>) => {
-    addHumanTask(projectId, task);
+  const handleAddTask = async (task: Omit<HumanTask, 'id' | 'createdAt'>) => {
+    // Write to TASKS.md instead of localStorage
+    try {
+      await addTask({
+        subject: task.subject,
+        description: task.description,
+        column: task.column,
+      });
+      // The file watcher will automatically update the UI
+    } catch (err) {
+      console.error('Failed to add task to TASKS.md:', err);
+      // Fallback to localStorage if TASKS.md fails
+      addHumanTask(projectId, task);
+    }
     setAddingToColumn(null);
   };
 
-  const handleDeleteTask = (taskId: string) => {
-    deleteHumanTask(projectId, taskId);
+  const handleDeleteTask = async (task: KanbanTask) => {
+    if (task.isTasksMdTask) {
+      // Delete from TASKS.md
+      try {
+        await deleteTask(task.subject);
+        // The file watcher will automatically update the UI
+      } catch (err) {
+        console.error('Failed to delete task from TASKS.md:', err);
+      }
+    } else if (task.isHumanTask) {
+      // Delete from localStorage
+      deleteHumanTask(projectId, task.id);
+    }
+  };
+
+  const handleEditTask = async (oldSubject: string, newSubject: string, newDescription?: string) => {
+    try {
+      await updateTask(oldSubject, newSubject, newDescription);
+      // The file watcher will automatically update the UI
+    } catch (err) {
+      console.error('Failed to update task in TASKS.md:', err);
+    }
+    setEditingTask(null);
   };
 
   const getColumnColorClasses = (column: KanbanColumn) => {
@@ -178,8 +218,13 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
                                 task={task}
                                 isDragging={snapshot.isDragging}
                                 onDelete={
-                                  task.isHumanTask
-                                    ? () => handleDeleteTask(task.id)
+                                  (task.isHumanTask || task.isTasksMdTask)
+                                    ? () => handleDeleteTask(task)
+                                    : undefined
+                                }
+                                onEdit={
+                                  task.isTasksMdTask
+                                    ? () => setEditingTask(task)
                                     : undefined
                                 }
                               />
@@ -225,6 +270,16 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
           initialColumn={addingToColumn}
           onAdd={handleAddTask}
           onCancel={() => setAddingToColumn(null)}
+        />
+      )}
+
+      {/* Edit task modal */}
+      {editingTask && (
+        <EditTaskModal
+          initialSubject={editingTask.subject}
+          initialDescription={editingTask.description}
+          onSave={handleEditTask}
+          onCancel={() => setEditingTask(null)}
         />
       )}
     </div>

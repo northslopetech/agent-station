@@ -92,6 +92,7 @@ export function EditorPane() {
     taskViewMode,
     setTaskViewMode,
     claudeTaskProgress,
+    tasksMdTasks,
   } = useAppStore();
 
   const [loading, setLoading] = useState(false);
@@ -212,6 +213,15 @@ export function EditorPane() {
   const filename = selectedFilePath?.split("/").pop() || "No file selected";
   const currentTaskProgress = selectedProjectId ? claudeTaskProgress[selectedProjectId] : null;
 
+  // Calculate combined task progress (TASKS.md + Claude tasks)
+  const projectMdTasks = selectedProjectId ? (tasksMdTasks[selectedProjectId] || []) : [];
+  const mdTasksTotal = projectMdTasks.length;
+  const mdTasksCompleted = projectMdTasks.filter((t) => t.completed).length;
+  const claudeTotal = currentTaskProgress?.total || 0;
+  const claudeCompleted = currentTaskProgress?.completed || 0;
+  const combinedTotal = mdTasksTotal + claudeTotal;
+  const combinedCompleted = mdTasksCompleted + claudeCompleted;
+
   if (!selectedProject) {
     return (
       <div className="h-full flex flex-col bg-zinc-800 text-zinc-100">
@@ -244,9 +254,9 @@ export function EditorPane() {
             <span className="text-sm text-zinc-300">
               {selectedProject.name}
             </span>
-            {currentTaskProgress && (
+            {combinedTotal > 0 && (
               <span className="text-xs text-zinc-500">
-                ({currentTaskProgress.completed}/{currentTaskProgress.total} completed)
+                ({combinedCompleted}/{combinedTotal} completed)
               </span>
             )}
           </div>

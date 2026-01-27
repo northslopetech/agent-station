@@ -67,6 +67,7 @@ const TASK_FILES: &[&str] = &[
     "plan.md",
     "todo.md",
     "tasks.md",
+    "TASKS.md",
     "CLAUDE.md",
 ];
 
@@ -457,6 +458,100 @@ pub fn move_task_in_tasks_md(
 
     // Write back
     write_tasks_md(project_path, tasks)
+}
+
+/// Add a new task to TASKS.md
+#[tauri::command]
+pub fn add_task_to_tasks_md(
+    project_path: String,
+    subject: String,
+    description: Option<String>,
+    column: String,
+) -> Result<(), String> {
+    let tasks_md_path = Path::new(&project_path).join("TASKS.md");
+
+    // Read existing tasks or start with empty list
+    let mut tasks = if tasks_md_path.exists() {
+        let content = fs::read_to_string(&tasks_md_path)
+            .map_err(|e| format!("Failed to read TASKS.md: {}", e))?;
+        parse_tasks_md(&content)?
+    } else {
+        vec![]
+    };
+
+    // Create new task
+    let new_task = TasksMdTask {
+        id: Uuid::new_v4().to_string(),
+        subject,
+        description,
+        column: column.clone(),
+        completed: column == "done",
+        line_number: 0, // Will be recalculated on write
+    };
+
+    tasks.push(new_task);
+
+    // Write back (this will create the file if it doesn't exist)
+    write_tasks_md(project_path, tasks)
+}
+
+/// Update a task in TASKS.md by finding it by its old subject
+#[tauri::command]
+pub fn update_task_in_tasks_md(
+    project_path: String,
+    old_subject: String,
+    new_subject: String,
+    new_description: Option<String>,
+) -> Result<(), String> {
+    let tasks_md_path = Path::new(&project_path).join("TASKS.md");
+
+    if !tasks_md_path.exists() {
+        return Err("TASKS.md does not exist".to_string());
+    }
+
+    let content = fs::read_to_string(&tasks_md_path)
+        .map_err(|e| format!("Failed to read TASKS.md: {}", e))?;
+
+    let mut tasks = parse_tasks_md(&content)?;
+
+    // Find the task by old subject and update it
+    let task = tasks.iter_mut().find(|t| t.subject == old_subject);
+    if let Some(t) = task {
+        t.subject = new_subject;
+        t.description = new_description;
+    } else {
+        return Err(format!("Task '{}' not found", old_subject));
+    }
+
+    // Write back
+    write_tasks_md(project_path, tasks)
+}
+
+/// Delete a task from TASKS.md by subject
+#[tauri::command]
+pub fn delete_task_from_tasks_md(
+    project_path: String,
+    task_subject: String,
+) -> Result<(), String> {
+    let tasks_md_path = Path::new(&project_path).join("TASKS.md");
+
+    if !tasks_md_path.exists() {
+        return Err("TASKS.md does not exist".to_string());
+    }
+
+    let content = fs::read_to_string(&tasks_md_path)
+        .map_err(|e| format!("Failed to read TASKS.md: {}", e))?;
+
+    let tasks = parse_tasks_md(&content)?;
+
+    // Filter out the task with matching subject
+    let filtered_tasks: Vec<TasksMdTask> = tasks
+        .into_iter()
+        .filter(|t| t.subject != task_subject)
+        .collect();
+
+    // Write back
+    write_tasks_md(project_path, filtered_tasks)
 }
 
 /// Start watching a project's TASKS.md file for changes
