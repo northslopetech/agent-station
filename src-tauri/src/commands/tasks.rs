@@ -232,6 +232,7 @@ pub struct TasksMdTask {
 /// Column name to heading mapping
 const COLUMN_HEADINGS: &[(&str, &str)] = &[
     ("backlog", "## Backlog"),
+    ("blocked", "## Blocked"),
     ("in_progress", "## In Progress"),
     ("review", "## Review"),
     ("done", "## Done"),
@@ -370,7 +371,7 @@ pub fn write_tasks_md(project_path: String, tasks: Vec<TasksMdTask>) -> Result<(
     let mut content = String::from("# TASKS\n\n");
 
     // Group tasks by column
-    let columns = ["backlog", "in_progress", "review", "done"];
+    let columns = ["backlog", "blocked", "in_progress", "review", "done"];
 
     for col in columns {
         let heading = column_to_heading(col);
@@ -413,6 +414,8 @@ pub fn create_tasks_md(project_path: String, project_name: String) -> Result<(),
 
 ## Backlog
 - [ ] Set up {} project
+
+## Blocked
 
 ## In Progress
 
@@ -710,5 +713,43 @@ mod tests {
 "#;
         let tasks = parse_tasks_md(content).unwrap();
         assert_eq!(tasks.len(), 0);
+    }
+
+    #[test]
+    fn test_parse_tasks_md_with_blocked() {
+        let content = r#"# TASKS
+
+## Backlog
+- [ ] Backlog task
+
+## Blocked
+- [ ] Waiting on API
+- [ ] Needs design review
+
+## In Progress
+- [ ] Active task
+
+## Review
+
+## Done
+- [x] Finished task
+"#;
+        let tasks = parse_tasks_md(content).unwrap();
+        assert_eq!(tasks.len(), 5);
+
+        assert_eq!(tasks[0].subject, "Backlog task");
+        assert_eq!(tasks[0].column, "backlog");
+
+        assert_eq!(tasks[1].subject, "Waiting on API");
+        assert_eq!(tasks[1].column, "blocked");
+
+        assert_eq!(tasks[2].subject, "Needs design review");
+        assert_eq!(tasks[2].column, "blocked");
+
+        assert_eq!(tasks[3].subject, "Active task");
+        assert_eq!(tasks[3].column, "in_progress");
+
+        assert_eq!(tasks[4].subject, "Finished task");
+        assert_eq!(tasks[4].column, "done");
     }
 }

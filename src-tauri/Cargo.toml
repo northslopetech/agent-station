@@ -1,6 +1,6 @@
 [package]
 name = "agent-station"
-version = "0.6.0"
+version = "0.6.1"
 description = "A desktop application for managing multiple Claude Code agents"
 authors = ["you"]
 edition = "2021"

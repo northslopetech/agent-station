@@ -75,7 +75,7 @@ export interface TasksMdTask {
   id: string;
   subject: string;
   description?: string;
-  column: 'backlog' | 'in_progress' | 'review' | 'done';
+  column: 'backlog' | 'blocked' | 'in_progress' | 'review' | 'done';
   completed: boolean;
   lineNumber: number;
 }
