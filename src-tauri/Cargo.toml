@@ -2,7 +2,9 @@
 name = "agent-station"
 version = "0.6.1"
 description = "A desktop application for managing multiple Claude Code agents"
-authors = ["you"]
+authors = ["Alexander Howard <ahoward@northslopetech.com>"]
+license = "MIT"
+repository = "https://github.com/northslopetech/agent-station"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
