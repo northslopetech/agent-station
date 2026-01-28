@@ -81,18 +81,6 @@ pnpm tauri build
 4. **Edit Files** - Click files in the tree to edit them while watching the agent work
 5. **Track Tasks** - Use the Kanban board (synced with TASKS.md) to manage work
 
-### Keyboard Shortcuts
-
-| Shortcut | Action |
-|----------|--------|
-| `Cmd+1` | Focus Projects pane |
-| `Cmd+2` | Focus File Tree |
-| `Cmd+3` | Focus Editor |
-| `Cmd+4` | Focus Terminal |
-| `Cmd+O` | Add Project |
-| `Cmd+W` | Remove Project |
-| `Cmd+F` | Find in Editor |
-
 ## Tech Stack
 
 - **[Tauri 2.x](https://tauri.app/)** - Rust backend, minimal footprint
