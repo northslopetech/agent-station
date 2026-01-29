@@ -37,6 +37,9 @@ When you click a project, **all panes update** to show that project's context.
 - **Monaco Editor** - VS Code's editor with syntax highlighting and auto-save
 - **File Tree** - Navigate project files with smart filtering (hides node_modules, .git, etc.)
 - **Task Board** - Kanban-style board synced with TASKS.md for project tracking
+- **Task Details** - Click any task to view full description, status, and dependencies
+- **Settings Panel** - Configure auto-start commands, notifications, zoom level, and more
+- **Notifications** - Get notified when Claude stops (with optional sound alerts)
 - **Filesystem Watching** - Auto-refreshes when files change on disk
 - **Dark Mode** - Follows system preference
 - **Lightweight** - ~10MB binary, minimal resource usage
