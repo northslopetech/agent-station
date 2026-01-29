@@ -3,7 +3,6 @@ import Editor, { loader } from "@monaco-editor/react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/appStore";
 import { KanbanBoard } from "./KanbanBoard";
-import type { ClaudeTask } from "../types";
 
 // Configure Monaco to use a dark theme by default
 loader.init().then((monaco) => {
@@ -54,27 +53,6 @@ function getLanguageFromPath(path: string): string {
   }
 }
 
-function getStatusIcon(status: ClaudeTask['status']) {
-  switch (status) {
-    case 'pending':
-      return (
-        <span className="w-4 h-4 rounded-full border-2 border-zinc-500 inline-block" />
-      );
-    case 'in_progress':
-      return (
-        <span className="w-4 h-4 rounded-full bg-blue-500 inline-block animate-pulse" />
-      );
-    case 'completed':
-      return (
-        <span className="w-4 h-4 text-emerald-500 inline-flex items-center justify-center">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        </span>
-      );
-  }
-}
-
 export function EditorPane() {
   const {
     projects,
@@ -89,10 +67,9 @@ export function EditorPane() {
     selectFile,
     editorViewMode,
     setEditorViewMode,
-    taskViewMode,
-    setTaskViewMode,
     claudeTaskProgress,
     tasksMdTasks,
+    zoomLevel,
   } = useAppStore();
 
   const [loading, setLoading] = useState(false);
@@ -222,16 +199,22 @@ export function EditorPane() {
   const combinedTotal = mdTasksTotal + claudeTotal;
   const combinedCompleted = mdTasksCompleted + claudeCompleted;
 
+  const headerFontSize = Math.round(12 * zoomLevel);
+  const baseFontSize = Math.round(14 * zoomLevel);
+
   if (!selectedProject) {
     return (
       <div className="h-full flex flex-col bg-zinc-800 text-zinc-100">
         <div className="p-3 border-b border-zinc-700">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">
+          <h2
+            className="font-semibold text-zinc-400 uppercase tracking-wide"
+            style={{ fontSize: `${headerFontSize}px` }}
+          >
             Editor
           </h2>
         </div>
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-zinc-500 text-sm">
+          <div className="text-zinc-500" style={{ fontSize: `${baseFontSize}px` }}>
             Select a project to edit files
           </div>
         </div>
@@ -239,142 +222,36 @@ export function EditorPane() {
     );
   }
 
-  // Task view (list or board)
+  // Task view (Kanban board)
   if (editorViewMode === 'tasks') {
-    const tasks = currentTaskProgress?.tasks || [];
-    const hasNoTasks = tasks.length === 0;
-
     return (
       <div className="h-full flex flex-col bg-zinc-800 text-zinc-100">
         <div className="p-3 border-b border-zinc-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">
+            <h2
+              className="font-semibold text-zinc-400 uppercase tracking-wide"
+              style={{ fontSize: `${headerFontSize}px` }}
+            >
               Tasks
             </h2>
-            <span className="text-sm text-zinc-300">
+            <span className="text-zinc-300" style={{ fontSize: `${baseFontSize}px` }}>
               {selectedProject.name}
             </span>
             {combinedTotal > 0 && (
-              <span className="text-xs text-zinc-500">
+              <span className="text-zinc-500" style={{ fontSize: `${Math.round(12 * zoomLevel)}px` }}>
                 ({combinedCompleted}/{combinedTotal} completed)
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            {/* View toggle */}
-            <div className="flex items-center bg-zinc-700/50 rounded p-0.5">
-              <button
-                onClick={() => setTaskViewMode('list')}
-                className={`px-2 py-1 text-xs rounded transition-colors ${
-                  taskViewMode === 'list'
-                    ? 'bg-zinc-600 text-zinc-100'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-                title="List view"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-              </button>
-              <button
-                onClick={() => setTaskViewMode('board')}
-                className={`px-2 py-1 text-xs rounded transition-colors ${
-                  taskViewMode === 'board'
-                    ? 'bg-zinc-600 text-zinc-100'
-                    : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-                title="Board view"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                </svg>
-              </button>
-            </div>
-            <button
-              onClick={() => setEditorViewMode('file')}
-              className="text-xs text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded hover:bg-zinc-700 transition-colors"
-            >
-              Back to Editor
-            </button>
-          </div>
+          <button
+            onClick={() => setEditorViewMode('file')}
+            className="text-zinc-400 hover:text-zinc-200 px-2 py-1 rounded hover:bg-zinc-700 transition-colors"
+            style={{ fontSize: `${Math.round(12 * zoomLevel)}px` }}
+          >
+            Back to Editor
+          </button>
         </div>
-
-        {/* Board view */}
-        {taskViewMode === 'board' ? (
-          <KanbanBoard projectId={selectedProjectId!} tasks={tasks} />
-        ) : (
-          /* List view */
-          <div className="flex-1 overflow-y-auto p-4">
-            {hasNoTasks ? (
-              <div className="flex items-center justify-center h-full text-zinc-500">
-                No tasks found for this project
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {tasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className={`p-3 rounded-lg border transition-colors ${
-                      task.status === 'in_progress'
-                        ? 'border-blue-500/50 bg-blue-500/10'
-                        : task.status === 'completed'
-                        ? 'border-zinc-700 bg-zinc-800/50'
-                        : task.blockedBy && task.blockedBy.length > 0
-                        ? 'border-zinc-700 bg-zinc-800/30'
-                        : 'border-zinc-700 bg-zinc-800'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="mt-0.5 flex-shrink-0">
-                        {getStatusIcon(task.status)}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div
-                          className={`font-medium ${
-                            task.status === 'completed'
-                              ? 'text-zinc-500 line-through'
-                              : task.blockedBy && task.blockedBy.length > 0
-                              ? 'text-zinc-500'
-                              : 'text-zinc-200'
-                          }`}
-                        >
-                          {task.subject}
-                        </div>
-                        {task.description && (
-                          <div className="mt-1 text-sm text-zinc-400 whitespace-pre-wrap">
-                            {task.description}
-                          </div>
-                        )}
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                          {task.status === 'in_progress' && (
-                            <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
-                              In Progress
-                            </span>
-                          )}
-                          {task.blockedBy && task.blockedBy.length > 0 && (
-                            <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-400">
-                              Blocked by: {task.blockedBy.join(', ')}
-                            </span>
-                          )}
-                          {task.blocks && task.blocks.length > 0 && (
-                            <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-400">
-                              Blocks: {task.blocks.join(', ')}
-                            </span>
-                          )}
-                          {task.owner && (
-                            <span className="px-2 py-0.5 rounded bg-zinc-700 text-zinc-400">
-                              Owner: {task.owner}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        <KanbanBoard projectId={selectedProjectId!} />
       </div>
     );
   }
@@ -384,18 +261,21 @@ export function EditorPane() {
     <div className="h-full flex flex-col bg-zinc-800 text-zinc-100">
       <div className="p-3 border-b border-zinc-700 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">
+          <h2
+            className="font-semibold text-zinc-400 uppercase tracking-wide"
+            style={{ fontSize: `${headerFontSize}px` }}
+          >
             Editor
           </h2>
           {selectedFilePath && (
-            <span className="text-sm text-zinc-300">
+            <span className="text-zinc-300" style={{ fontSize: `${baseFontSize}px` }}>
               {filename}
               {isDirty && <span className="text-zinc-500 ml-1">•</span>}
             </span>
           )}
         </div>
         {saving && (
-          <span className="text-xs text-zinc-500">Saving...</span>
+          <span className="text-zinc-500" style={{ fontSize: `${Math.round(12 * zoomLevel)}px` }}>Saving...</span>
         )}
       </div>
 
@@ -420,8 +300,8 @@ export function EditorPane() {
             onChange={handleEditorChange}
             theme="agent-station-dark"
             options={{
-              fontSize: 13,
-              lineHeight: 20,
+              fontSize: Math.round(13 * zoomLevel),
+              lineHeight: Math.round(20 * zoomLevel),
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
               wordWrap: "on",

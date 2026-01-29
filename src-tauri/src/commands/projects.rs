@@ -67,6 +67,15 @@ pub fn add_project(path: String, state: tauri::State<'_, crate::state::AppState>
         eprintln!("Failed to create TASKS.md: {}", e);
     }
 
+    // Create CLAUDE.md if it doesn't exist
+    let claude_md_path = Path::new(&project.path).join("CLAUDE.md");
+    if !claude_md_path.exists() {
+        let template = format!("# {}\n\nProject instructions and context for Claude.\n", project.name);
+        if let Err(e) = fs::write(&claude_md_path, template) {
+            eprintln!("Failed to create CLAUDE.md: {}", e);
+        }
+    }
+
     Ok(project)
 }
 

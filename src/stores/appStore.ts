@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Project, FileNode, TaskProgress, ClaudeTaskProgress, KanbanColumn, TaskOverlay, HumanTask, TasksMdTask } from '../types';
+import type { Project, FileNode, TaskProgress, ClaudeTaskProgress, KanbanColumn, TaskOverlay, HumanTask, TasksMdTask, Settings, ClaudeProcessState } from '../types';
 
 interface AppState {
   // Projects
@@ -16,11 +16,8 @@ interface AppState {
   editorLanguage: string;
   isDirty: boolean;
 
-  // Editor view mode: 'file' shows Monaco editor, 'tasks' shows task list
+  // Editor view mode: 'file' shows Monaco editor, 'tasks' shows Kanban board
   editorViewMode: 'file' | 'tasks';
-
-  // Task view mode within tasks: 'list' or 'board'
-  taskViewMode: 'list' | 'board';
 
   // Kanban state per project (persisted)
   kanbanState: Record<string, {
@@ -45,6 +42,15 @@ interface AppState {
   // Persisted so names survive across sessions
   terminalNames: Record<string, string>;
 
+  // Settings
+  settings: Settings;
+
+  // Claude process state per terminal (terminalId -> state)
+  claudeProcessStates: Record<string, ClaudeProcessState>;
+
+  // Zoom level (1.0 = 100%, range 0.5-2.0)
+  zoomLevel: number;
+
   // Actions
   setProjects: (projects: Project[]) => void;
   addProject: (project: Project) => void;
@@ -55,6 +61,15 @@ interface AppState {
   addTerminalToProject: (projectId: string, terminalId: string) => void;
   removeTerminalFromProject: (projectId: string, terminalId: string) => void;
   setTerminalName: (terminalId: string, name: string) => void;
+
+  setSettings: (settings: Settings) => void;
+  updateSettings: (updates: Partial<Settings>) => void;
+  setClaudeProcessState: (terminalId: string, state: ClaudeProcessState) => void;
+  clearNeedsAttention: (terminalId: string) => void;
+  setZoomLevel: (level: number) => void;
+  incrementZoom: () => void;
+  decrementZoom: () => void;
+  resetZoom: () => void;
 
   setFileTree: (tree: FileNode | null) => void;
   selectFile: (path: string | null) => void;
@@ -69,7 +84,6 @@ interface AppState {
   setTasksMdTasks: (projectId: string, tasks: TasksMdTask[]) => void;
 
   // Kanban actions
-  setTaskViewMode: (mode: 'list' | 'board') => void;
   setTaskOverlay: (projectId: string, taskId: string, overlay: Partial<TaskOverlay>) => void;
   addHumanTask: (projectId: string, task: Omit<HumanTask, 'id' | 'createdAt'>) => void;
   updateHumanTask: (projectId: string, taskId: string, updates: Partial<HumanTask>) => void;
@@ -89,13 +103,23 @@ export const useAppStore = create<AppState>()(
       editorLanguage: 'markdown',
       isDirty: false,
       editorViewMode: 'file',
-      taskViewMode: 'list',
       kanbanState: {},
       taskProgress: {},
       claudeTaskProgress: {},
       tasksMdTasks: {},
       terminalIds: {},
       terminalNames: {},
+      settings: {
+        autoStartClaude: false,
+        autoStartCommand: 'claude --dangerously-skip-permissions',
+        zoomLevel: 1.0,
+        enableNotifications: true,
+        enableSound: true,
+        notificationSound: 'default',
+        notifyOnlyWhenUnfocused: true,
+      },
+      claudeProcessStates: {},
+      zoomLevel: 1.0,
 
       // Project actions
       setProjects: (projects) => set({ projects }),
@@ -162,6 +186,68 @@ export const useAppStore = create<AppState>()(
           },
         })),
 
+      // Settings actions
+      setSettings: (settings) => set({ settings, zoomLevel: settings.zoomLevel }),
+
+      updateSettings: (updates) =>
+        set((state) => ({
+          settings: { ...state.settings, ...updates },
+          zoomLevel: updates.zoomLevel ?? state.zoomLevel,
+        })),
+
+      // Claude process state actions
+      setClaudeProcessState: (terminalId, processState) =>
+        set((state) => ({
+          claudeProcessStates: {
+            ...state.claudeProcessStates,
+            [terminalId]: processState,
+          },
+        })),
+
+      clearNeedsAttention: (terminalId) =>
+        set((state) => ({
+          claudeProcessStates: {
+            ...state.claudeProcessStates,
+            [terminalId]: {
+              ...state.claudeProcessStates[terminalId],
+              needsAttention: false,
+            },
+          },
+        })),
+
+      // Zoom actions
+      setZoomLevel: (level) => {
+        const clampedLevel = Math.max(0.5, Math.min(2.0, level));
+        set((state) => ({
+          zoomLevel: clampedLevel,
+          settings: { ...state.settings, zoomLevel: clampedLevel },
+        }));
+      },
+
+      incrementZoom: () =>
+        set((state) => {
+          const newLevel = Math.min(2.0, state.zoomLevel + 0.1);
+          return {
+            zoomLevel: newLevel,
+            settings: { ...state.settings, zoomLevel: newLevel },
+          };
+        }),
+
+      decrementZoom: () =>
+        set((state) => {
+          const newLevel = Math.max(0.5, state.zoomLevel - 0.1);
+          return {
+            zoomLevel: newLevel,
+            settings: { ...state.settings, zoomLevel: newLevel },
+          };
+        }),
+
+      resetZoom: () =>
+        set((state) => ({
+          zoomLevel: 1.0,
+          settings: { ...state.settings, zoomLevel: 1.0 },
+        })),
+
       // File tree actions
       setFileTree: (tree) => set({ fileTree: tree }),
 
@@ -207,8 +293,6 @@ export const useAppStore = create<AppState>()(
         })),
 
       // Kanban actions
-      setTaskViewMode: (mode) => set({ taskViewMode: mode }),
-
       setTaskOverlay: (projectId, taskId, overlay) =>
         set((state) => {
           const projectState = state.kanbanState[projectId] || { taskOverlays: {}, humanTasks: [] };
@@ -325,6 +409,8 @@ export const useAppStore = create<AppState>()(
         selectedProjectId: state.selectedProjectId,
         terminalNames: state.terminalNames,
         kanbanState: state.kanbanState,
+        settings: state.settings,
+        zoomLevel: state.zoomLevel,
       }),
     }
   )

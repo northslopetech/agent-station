@@ -1,4 +1,4 @@
-import type { ClaudeTask, KanbanColumn, TaskOverlay, HumanTask, TasksMdTask } from '../types';
+import type { KanbanColumn, HumanTask, TasksMdTask } from '../types';
 
 export interface KanbanTask {
   id: string;
@@ -11,50 +11,6 @@ export interface KanbanTask {
   blockedBy?: string[];
   blocks?: string[];
   owner?: string;
-  originalStatus?: ClaudeTask['status'];
-}
-
-/**
- * Maps Claude task status to default Kanban column
- */
-function getDefaultColumn(task: ClaudeTask): KanbanColumn {
-  if (task.status === 'completed') {
-    return 'done';
-  }
-  if (task.status === 'in_progress') {
-    return 'in_progress';
-  }
-  // Pending tasks
-  if (task.blockedBy && task.blockedBy.length > 0) {
-    return 'blocked';
-  }
-  return 'backlog';
-}
-
-/**
- * Maps Claude tasks to Kanban tasks, applying overlays
- */
-export function mapClaudeTasksToKanban(
-  tasks: ClaudeTask[],
-  overlays: Record<string, TaskOverlay>
-): KanbanTask[] {
-  return tasks.map((task) => {
-    const overlay = overlays[task.id];
-    const defaultColumn = getDefaultColumn(task);
-
-    return {
-      id: task.id,
-      subject: task.subject,
-      description: task.description,
-      column: overlay?.column ?? defaultColumn,
-      isHumanTask: false,
-      assignee: 'agent',
-      blockedBy: task.blockedBy,
-      blocks: task.blocks,
-      owner: task.owner,
-      originalStatus: task.status,
-    };
-  });
 }
 
 /**

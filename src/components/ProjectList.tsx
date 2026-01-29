@@ -26,6 +26,8 @@ interface SortableProjectItemProps {
   progress: TaskProgress | undefined;
   claudeProgress: ClaudeTaskProgress | undefined;
   isShowingTasks: boolean;
+  needsAttention: boolean;
+  zoomLevel: number;
   onSelect: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
   onStatusBarClick: (e: React.MouseEvent) => void;
@@ -38,6 +40,8 @@ function SortableProjectItem({
   progress,
   claudeProgress,
   isShowingTasks,
+  needsAttention,
+  zoomLevel,
   onSelect,
   onContextMenu,
   onStatusBarClick,
@@ -51,6 +55,9 @@ function SortableProjectItem({
     transition,
     isDragging,
   } = useSortable({ id: project.id });
+
+  const baseFontSize = Math.round(14 * zoomLevel);
+  const smallFontSize = Math.round(10 * zoomLevel);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -82,10 +89,12 @@ function SortableProjectItem({
       {...listeners}
     >
       <div className="flex items-center gap-2">
-        {project.hasActiveProcess && (
+        {needsAttention ? (
+          <span className="w-2 h-2 rounded-full bg-amber-500 animate-[pulse_0.5s_ease-in-out_infinite]" title="Claude has stopped" />
+        ) : project.hasActiveProcess ? (
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-        )}
-        <span className="text-sm truncate flex-1">{project.name}</span>
+        ) : null}
+        <span className="truncate flex-1" style={{ fontSize: `${baseFontSize}px` }}>{project.name}</span>
       </div>
 
       {/* Combined Task Progress (TASKS.md + Claude tasks) */}
@@ -103,7 +112,7 @@ function SortableProjectItem({
               style={{ width: `${combinedPercentage}%` }}
             />
           </div>
-          <div className="text-[10px] text-zinc-500 mt-0.5 flex items-center gap-2">
+          <div className="text-zinc-500 mt-0.5 flex items-center gap-2" style={{ fontSize: `${smallFontSize}px` }}>
             <span>{Math.round(combinedPercentage)}%</span>
             <span>
               ({combinedCompleted}/{combinedTotal})
@@ -135,6 +144,10 @@ export function ProjectList() {
     setClaudeTaskProgress,
     editorViewMode,
     setEditorViewMode,
+    terminalIds,
+    claudeProcessStates,
+    clearNeedsAttention,
+    zoomLevel,
   } = useAppStore();
 
   const sensors = useSensors(
@@ -280,10 +293,13 @@ export function ProjectList() {
     [projects, reorderProjects]
   );
 
+  const headerFontSize = Math.round(12 * zoomLevel);
+  const baseFontSize = Math.round(14 * zoomLevel);
+
   return (
     <div className="h-full flex flex-col bg-zinc-900 text-zinc-100">
       <div className="p-3 border-b border-zinc-700 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">
+        <h2 className="font-semibold text-zinc-400 uppercase tracking-wide" style={{ fontSize: `${headerFontSize}px` }}>
           Projects
         </h2>
         <button
@@ -299,7 +315,7 @@ export function ProjectList() {
 
       <div className="flex-1 overflow-y-auto">
         {projects.length === 0 ? (
-          <div className="text-zinc-500 text-sm p-4 text-center">
+          <div className="text-zinc-500 p-4 text-center" style={{ fontSize: `${baseFontSize}px` }}>
             No projects added yet
           </div>
         ) : (
@@ -327,6 +343,12 @@ export function ProjectList() {
                   const isShowingTasks =
                     selectedProjectId === project.id && editorViewMode === "tasks";
 
+                  // Check if any terminal for this project needs attention
+                  const projectTerminals = terminalIds[project.id] || [];
+                  const needsAttention = projectTerminals.some(
+                    (tid) => claudeProcessStates[tid]?.needsAttention
+                  );
+
                   return (
                     <SortableProjectItem
                       key={project.id}
@@ -335,7 +357,17 @@ export function ProjectList() {
                       progress={progress}
                       claudeProgress={claudeProgress}
                       isShowingTasks={isShowingTasks}
-                      onSelect={() => selectProject(project.id)}
+                      needsAttention={needsAttention}
+                      zoomLevel={zoomLevel}
+                      onSelect={() => {
+                        selectProject(project.id);
+                        // Clear attention for all terminals of this project
+                        projectTerminals.forEach((tid) => {
+                          if (claudeProcessStates[tid]?.needsAttention) {
+                            clearNeedsAttention(tid);
+                          }
+                        });
+                      }}
                       onContextMenu={(e) => handleContextMenu(e, project.id)}
                       onStatusBarClick={(e) => handleStatusBarClick(e, project.id)}
                       getProgressColor={getProgressColor}

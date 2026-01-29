@@ -1,6 +1,6 @@
 [package]
 name = "agent-station"
-version = "0.6.1"
+version = "0.7.0"
 description = "A desktop application for managing multiple Claude Code agents"
 authors = ["Alexander Howard <ahoward@northslopetech.com>"]
 license = "MIT"
@@ -32,4 +32,5 @@ regex = "1"
 portable-pty = "0.9"
 tokio = { version = "1", features = ["sync", "io-util", "time"] }
 notify = "6.1"
+tauri-plugin-notification = "2"
 

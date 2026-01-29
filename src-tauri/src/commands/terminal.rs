@@ -1,4 +1,4 @@
-use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -27,6 +27,7 @@ pub struct TerminalInstance {
     pub id: String,
     pub project_id: String,
     pub writer: Arc<Mutex<Box<dyn Write + Send>>>,
+    pub master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
     pub running: Arc<Mutex<bool>>,
 }
 
@@ -99,6 +100,7 @@ pub fn spawn_terminal(
         .map_err(|e| format!("Failed to take writer: {}", e))?;
 
     let writer = Arc::new(Mutex::new(writer));
+    let master = Arc::new(Mutex::new(pair.master));
     let running = Arc::new(Mutex::new(true));
     let running_clone = running.clone();
 
@@ -111,6 +113,7 @@ pub fn spawn_terminal(
                 id: terminal_id.clone(),
                 project_id: project_id.clone(),
                 writer: writer.clone(),
+                master: master.clone(),
                 running: running.clone(),
             },
         );
@@ -195,15 +198,24 @@ pub fn resize_terminal(
     terminal_id: String,
     cols: u16,
     rows: u16,
-    _state: tauri::State<'_, TerminalManager>,
+    state: tauri::State<'_, TerminalManager>,
 ) -> Result<(), String> {
-    // Note: portable-pty doesn't have a straightforward resize API on the stored instance
-    // For now, we'll log this but not implement resize
-    // A full implementation would require storing the master PTY handle
-    eprintln!(
-        "Resize requested for terminal {}: {}x{}",
-        terminal_id, cols, rows
-    );
+    let terminals = state.terminals.lock().map_err(|e| e.to_string())?;
+
+    let terminal = terminals
+        .get(&terminal_id)
+        .ok_or_else(|| "Terminal not found".to_string())?;
+
+    let master = terminal.master.lock().map_err(|e| e.to_string())?;
+    master
+        .resize(PtySize {
+            rows,
+            cols,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|e| format!("Failed to resize terminal: {}", e))?;
+
     Ok(())
 }
 

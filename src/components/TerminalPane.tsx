@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { useAppStore } from "../stores/appStore";
+import { SettingsModal } from "./SettingsModal";
 import "@xterm/xterm/css/xterm.css";
 
 interface TerminalOutput {
@@ -59,9 +60,12 @@ export function TerminalPane() {
     addTerminalToProject,
     removeTerminalFromProject,
     setTerminalName,
+    zoomLevel,
+    settings,
   } = useAppStore();
 
   const [activeTerminalIndex, setActiveTerminalIndex] = useState(0);
+  const [showSettings, setShowSettings] = useState(false);
   const [editingTerminalId, setEditingTerminalId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -88,10 +92,11 @@ export function TerminalPane() {
 
   // Create terminal instance for a given terminal ID
   const createTerminalInstance = useCallback((terminalId: string): TerminalInstance => {
+    const currentZoom = useAppStore.getState().zoomLevel;
     const terminal = new Terminal({
       theme: TERMINAL_THEME,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      fontSize: 13,
+      fontSize: Math.round(13 * currentZoom),
       lineHeight: 1.2,
       cursorBlink: true,
       scrollback: 10000,
@@ -114,7 +119,7 @@ export function TerminalPane() {
   }, []);
 
   // Spawn a new terminal for a project
-  const spawnTerminal = useCallback(async (projectId: string, projectPath: string): Promise<string | null> => {
+  const spawnTerminal = useCallback(async (projectId: string, projectPath: string, autoStart = true): Promise<string | null> => {
     try {
       const terminalId = await invoke<string>("spawn_terminal", {
         projectId: projectId,
@@ -128,12 +133,27 @@ export function TerminalPane() {
       addTerminalToProject(projectId, terminalId);
       updateProjectProcessStatus(projectId, true);
 
+      // Auto-start claude if enabled in settings
+      if (autoStart && settings.autoStartClaude && settings.autoStartCommand) {
+        // Small delay to ensure terminal is ready
+        setTimeout(async () => {
+          try {
+            await invoke("write_terminal", {
+              terminalId,
+              data: settings.autoStartCommand + "\n",
+            });
+          } catch (err) {
+            console.error("Failed to auto-start command:", err);
+          }
+        }, 500);
+      }
+
       return terminalId;
     } catch (err) {
       console.error("Failed to spawn terminal:", err);
       return null;
     }
-  }, [createTerminalInstance, addTerminalToProject, updateProjectProcessStatus]);
+  }, [createTerminalInstance, addTerminalToProject, updateProjectProcessStatus, settings.autoStartClaude, settings.autoStartCommand]);
 
   // Handle spawning additional terminal
   const handleSpawnAdditional = useCallback(async () => {
@@ -295,12 +315,17 @@ export function TerminalPane() {
       terminal.element.style.display = "block";
     }
 
-    // Fit after showing
-    setTimeout(() => {
+    // Fit after showing and sync PTY size
+    const terminalId = activeTerminalId;
+    setTimeout(async () => {
       try {
         fitAddon.fit();
+        // Sync PTY size with xterm.js dimensions
+        const cols = terminal.cols;
+        const rows = terminal.rows;
+        await invoke("resize_terminal", { terminalId, cols, rows });
       } catch {
-        // Ignore fit errors
+        // Ignore fit/resize errors
       }
     }, 0);
 
@@ -403,14 +428,19 @@ export function TerminalPane() {
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const resizeObserver = new ResizeObserver(() => {
-      if (currentTerminalIdRef.current) {
-        const instance = terminalsRef.current.get(currentTerminalIdRef.current);
+    const resizeObserver = new ResizeObserver(async () => {
+      const terminalId = currentTerminalIdRef.current;
+      if (terminalId) {
+        const instance = terminalsRef.current.get(terminalId);
         if (instance) {
           try {
             instance.fitAddon.fit();
+            // Sync PTY size with xterm.js dimensions
+            const cols = instance.terminal.cols;
+            const rows = instance.terminal.rows;
+            await invoke("resize_terminal", { terminalId, cols, rows });
           } catch {
-            // Ignore
+            // Ignore fit/resize errors
           }
         }
       }
@@ -436,19 +466,53 @@ export function TerminalPane() {
     };
   }, []);
 
+  // Update terminal font size when zoom level changes
+  useEffect(() => {
+    const newFontSize = Math.round(13 * zoomLevel);
+    terminalsRef.current.forEach(async (instance, terminalId) => {
+      instance.terminal.options.fontSize = newFontSize;
+      try {
+        instance.fitAddon.fit();
+        // Sync PTY size with xterm.js dimensions
+        const cols = instance.terminal.cols;
+        const rows = instance.terminal.rows;
+        await invoke("resize_terminal", { terminalId, cols, rows });
+      } catch {
+        // Ignore fit/resize errors
+      }
+    });
+  }, [zoomLevel]);
+
+  const headerFontSize = Math.round(12 * zoomLevel);
+  const baseFontSize = Math.round(14 * zoomLevel);
+
   if (!selectedProject) {
     return (
       <div className="h-full flex flex-col bg-zinc-950 text-zinc-100">
         <div className="p-3 border-b border-zinc-700 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">
+          <h2
+            className="font-semibold text-zinc-400 uppercase tracking-wide"
+            style={{ fontSize: `${headerFontSize}px` }}
+          >
             Terminal
           </h2>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 rounded"
+            title="Settings"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
         </div>
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-zinc-500 text-sm">
+          <div className="text-zinc-500" style={{ fontSize: `${baseFontSize}px` }}>
             Select a project to open a terminal
           </div>
         </div>
+        <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
       </div>
     );
   }
@@ -459,13 +523,26 @@ export function TerminalPane() {
       <div className="border-b border-zinc-700">
         <div className="flex items-center justify-between px-3 py-2">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">
+            <h2
+              className="font-semibold text-zinc-400 uppercase tracking-wide"
+              style={{ fontSize: `${headerFontSize}px` }}
+            >
               Terminal
             </h2>
             {hasTerminals && (
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             )}
           </div>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 rounded"
+            title="Settings"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
         </div>
 
         {/* Terminal tabs */}
@@ -480,11 +557,12 @@ export function TerminalPane() {
                   key={tid}
                   onClick={() => !isEditing && setActiveTerminalIndex(index)}
                   onDoubleClick={() => handleDoubleClickTab(tid, displayName)}
-                  className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors cursor-pointer ${
+                  className={`flex items-center gap-1 px-2 py-1 rounded transition-colors cursor-pointer ${
                     activeTerminalIndex === index
                       ? "bg-zinc-700 text-zinc-100"
                       : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300"
                   }`}
+                  style={{ fontSize: `${Math.round(12 * zoomLevel)}px` }}
                 >
                   {isEditing ? (
                     <input
@@ -525,6 +603,8 @@ export function TerminalPane() {
       </div>
 
       <div ref={containerRef} className="flex-1 p-2" />
+
+      <SettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </div>
   );
 }

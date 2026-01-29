@@ -19,12 +19,6 @@ export interface FileNode {
   children?: FileNode[];
 }
 
-export interface TerminalState {
-  id: string;
-  projectId: string;
-  isRunning: boolean;
-}
-
 // Claude Code task types
 export interface ClaudeTask {
   id: string;
@@ -64,12 +58,6 @@ export interface HumanTask {
   createdAt: number;
 }
 
-export interface KanbanState {
-  projectId: string;
-  taskOverlays: Record<string, TaskOverlay>;
-  humanTasks: HumanTask[];
-}
-
 // TASKS.md task type
 export interface TasksMdTask {
   id: string;
@@ -78,4 +66,22 @@ export interface TasksMdTask {
   column: 'backlog' | 'blocked' | 'in_progress' | 'review' | 'done';
   completed: boolean;
   lineNumber: number;
+}
+
+// Settings types
+export interface Settings {
+  autoStartClaude: boolean;
+  autoStartCommand: string;
+  zoomLevel: number;
+  enableNotifications: boolean;
+  enableSound: boolean;
+  notificationSound: string;
+  notifyOnlyWhenUnfocused: boolean;
+}
+
+// Claude process state for attention tracking
+export interface ClaudeProcessState {
+  isRunning: boolean;
+  needsAttention: boolean;
+  startedAt?: number;
 }

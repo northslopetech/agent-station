@@ -305,6 +305,81 @@ use notify::{Watcher, RecursiveMode, watcher};
 // Emit events to frontend via Tauri events
 ```
 
+## Claude Code State Detection
+
+Detecting whether Claude Code is running or waiting for input is non-trivial. Here are the learnings from attempted approaches:
+
+### What DOESN'T Work
+
+#### Input Prompt Detection (`claude>`, `>`)
+- **Problem**: The `>` character appears frequently in code output, markdown, and other content
+- **Problem**: ANSI escape codes surround the prompt, making regex matching unreliable
+- **Problem**: Terminal output arrives in chunks, so the prompt may be split across data events
+- **Conclusion**: Too many false positives or fails to match
+
+### What DOES Work
+
+#### Bell Character Detection (`\x07`) - With Debouncing
+- Claude rings the bell when stopping/waiting for input
+- **Requires debouncing** to avoid spam (30 second cooldown between notifications)
+- **Requires Claude running 3+ seconds** to avoid false positives during startup
+- When user types in terminal, `needsAttention` is cleared
+
+#### Claude Startup Detection
+These patterns reliably indicate Claude Code is starting:
+- `Anthropic's official CLI` - Part of the startup banner
+- `Type /help` - Help hint shown at startup
+
+#### Claude Working Detection
+These patterns indicate Claude is actively processing:
+- `● ` - Streaming output bullet
+- `❯ ` - Action indicator
+- `[Reading]`, `[Searching]`, `[Writing]`, `[Editing]` - Tool use indicators
+
+#### Exit Signal Detection
+These patterns indicate Claude has stopped:
+- `Goodbye!` - Claude's goodbye message
+- `^C.*^C` - Double Ctrl+C (interrupt)
+- `Interrupted.` - Interrupt message
+- `Session ended`, `exited with code`
+
+### Recommended Approach: Hook Marker
+
+The most reliable method is using Claude Code's hook system to emit a custom marker:
+
+1. Create a stop hook in `~/.claude/hooks/stop.sh`:
+```bash
+#!/bin/bash
+echo "[AGENT_STATION_STOP]"
+```
+
+2. Configure Claude Code to run this hook when stopping
+
+3. Detect the marker `[AGENT_STATION_STOP]` in terminal output
+
+This is 100% reliable because it's an explicit signal, not pattern matching.
+
+### Current Implementation
+
+Located in `src/components/TerminalPane.tsx`:
+- Maintains output buffer (last 2000 chars) per terminal
+- Tracks last notification time per terminal for debouncing (30 second cooldown)
+- Detects start patterns → sets `isRunning: true`
+- Detects working patterns → sets `isRunning: true`
+- Detects hook marker, bell (with debounce), or exit signals → sets `isRunning: false, needsAttention: true`
+- User typing in terminal clears `needsAttention`
+- Manual toggle available by clicking status indicator dot
+
+### Status Indicator Colors
+- **Gray** (`bg-zinc-600`) - Claude not running
+- **Blue pulsing** (`bg-blue-500 animate-pulse`) - Claude running/working
+- **Amber pulsing** (`bg-amber-500 animate-pulse`) - Claude stopped, needs attention
+
+### Known Issues
+- Bell detection has 30-second cooldown, so rapid stop/start cycles may miss some notifications
+- Pattern matching for prompt/exit signals is fragile due to ANSI escape codes
+- Terminal output arrives in variable-sized chunks, complicating pattern matching
+
 ## Build & Development
 
 ### Prerequisites

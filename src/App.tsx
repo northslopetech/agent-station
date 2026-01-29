@@ -1,9 +1,9 @@
+import { useEffect } from "react";
 import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
 import { ProjectList } from "./components/ProjectList";
 import { FileTree } from "./components/FileTree";
 import { EditorPane } from "./components/EditorPane";
 import { TerminalPane } from "./components/TerminalPane";
-import { StatusBar } from "./components/StatusBar";
 import { useTasksMdWatcher } from "./hooks/useTasksMdWatcher";
 import { useAppStore } from "./stores/appStore";
 import "./App.css";
@@ -26,7 +26,36 @@ function App() {
   // Watch TASKS.md for changes
   useTasksMdWatcher();
 
-  const selectedProjectId = useAppStore((s) => s.selectedProjectId);
+  const incrementZoom = useAppStore((s) => s.incrementZoom);
+  const decrementZoom = useAppStore((s) => s.decrementZoom);
+  const resetZoom = useAppStore((s) => s.resetZoom);
+
+  // Keyboard shortcuts for zoom
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Cmd/Ctrl modifier
+      if (e.metaKey || e.ctrlKey) {
+        // Zoom in: Cmd/Ctrl + Plus or Cmd/Ctrl + =
+        if (e.key === "+" || e.key === "=") {
+          e.preventDefault();
+          incrementZoom();
+        }
+        // Zoom out: Cmd/Ctrl + Minus
+        else if (e.key === "-") {
+          e.preventDefault();
+          decrementZoom();
+        }
+        // Reset zoom: Cmd/Ctrl + 0
+        else if (e.key === "0") {
+          e.preventDefault();
+          resetZoom();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [incrementZoom, decrementZoom, resetZoom]);
 
   return (
     <div className="h-screen w-screen bg-zinc-900 flex flex-col">
@@ -85,9 +114,6 @@ function App() {
           <TerminalPane />
         </Panel>
       </Group>
-
-      {/* Status Bar */}
-      {selectedProjectId && <StatusBar projectId={selectedProjectId} />}
     </div>
   );
 }

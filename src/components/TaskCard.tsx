@@ -3,28 +3,31 @@ import type { KanbanTask } from '../utils/kanbanMapper';
 interface TaskCardProps {
   task: KanbanTask;
   isDragging?: boolean;
+  zoomLevel?: number;
   onDelete?: () => void;
   onEdit?: () => void;
+  onClick?: () => void;
 }
 
-export function TaskCard({ task, isDragging, onDelete, onEdit }: TaskCardProps) {
+export function TaskCard({ task, isDragging, zoomLevel = 1, onDelete, onEdit, onClick }: TaskCardProps) {
   const isCompleted = task.column === 'done';
   const isBlocked = task.column === 'blocked';
   const isInProgress = task.column === 'in_progress';
 
   return (
     <div
-      className={`p-2.5 rounded-md border transition-all ${
+      className={`p-2.5 rounded-md border transition-all cursor-pointer ${
         isDragging
           ? 'opacity-50 border-blue-500 bg-blue-500/20'
           : isInProgress
-          ? 'border-blue-500/50 bg-blue-500/10'
+          ? 'border-blue-500/50 bg-blue-500/10 hover:border-blue-500/70'
           : isCompleted
-          ? 'border-zinc-700 bg-zinc-800/50'
+          ? 'border-zinc-700 bg-zinc-800/50 hover:border-zinc-600'
           : isBlocked
-          ? 'border-red-500/30 bg-red-500/5'
-          : 'border-zinc-700 bg-zinc-800'
+          ? 'border-red-500/30 bg-red-500/5 hover:border-red-500/50'
+          : 'border-zinc-700 bg-zinc-800 hover:border-zinc-600'
       }`}
+      onClick={onClick}
     >
       <div className="flex items-start gap-2">
         {/* Status indicator */}
@@ -51,16 +54,20 @@ export function TaskCard({ task, isDragging, onDelete, onEdit }: TaskCardProps) 
         <div className="flex-1 min-w-0">
           {/* Subject */}
           <div
-            className={`text-sm font-medium ${
+            className={`font-medium ${
               isCompleted ? 'text-zinc-500 line-through' : 'text-zinc-200'
             }`}
+            style={{ fontSize: `${Math.round(14 * zoomLevel)}px` }}
           >
             {task.subject}
           </div>
 
           {/* Description preview */}
           {task.description && (
-            <div className="mt-1 text-xs text-zinc-500 line-clamp-2">
+            <div
+              className="mt-1 text-zinc-500 line-clamp-2"
+              style={{ fontSize: `${Math.round(12 * zoomLevel)}px` }}
+            >
               {task.description}
             </div>
           )}
@@ -69,25 +76,32 @@ export function TaskCard({ task, isDragging, onDelete, onEdit }: TaskCardProps) 
           <div className="mt-1.5 flex flex-wrap gap-1">
             {/* Source tag */}
             <span
-              className={`px-1.5 py-0.5 rounded text-[10px] ${
+              className={`px-1.5 py-0.5 rounded ${
                 task.isHumanTask
                   ? 'bg-purple-500/20 text-purple-400'
                   : 'bg-cyan-500/20 text-cyan-400'
               }`}
+              style={{ fontSize: `${Math.round(10 * zoomLevel)}px` }}
             >
               {task.isHumanTask ? 'Human' : 'Agent'}
             </span>
 
             {/* Blocked by */}
             {task.blockedBy && task.blockedBy.length > 0 && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-red-500/20 text-red-400">
+              <span
+                className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400"
+                style={{ fontSize: `${Math.round(10 * zoomLevel)}px` }}
+              >
                 Blocked
               </span>
             )}
 
             {/* Owner */}
             {task.owner && (
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-600 text-zinc-300">
+              <span
+                className="px-1.5 py-0.5 rounded bg-zinc-600 text-zinc-300"
+                style={{ fontSize: `${Math.round(10 * zoomLevel)}px` }}
+              >
                 {task.owner}
               </span>
             )}

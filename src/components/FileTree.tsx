@@ -21,6 +21,7 @@ interface TreeNodeProps {
   creatingIn: string | null;
   creatingType: "file" | "folder" | null;
   creatingValue: string;
+  zoomLevel: number;
   onToggle: (path: string) => void;
   onSelect: (path: string) => void;
   onContextMenu: (e: React.MouseEvent, entry: FileEntry) => void;
@@ -42,6 +43,7 @@ function TreeNode({
   creatingIn,
   creatingType,
   creatingValue,
+  zoomLevel,
   onToggle,
   onSelect,
   onContextMenu,
@@ -52,6 +54,7 @@ function TreeNode({
   onCreateSubmit,
   onCreateCancel,
 }: TreeNodeProps) {
+  const fontSize = Math.round(14 * zoomLevel);
   const isExpanded = expandedPaths.has(node.path);
   const isSelected = selectedPath === node.path;
   const isRenaming = renamingPath === node.path;
@@ -100,10 +103,10 @@ function TreeNode({
   return (
     <div>
       <div
-        className={`flex items-center gap-1 px-2 py-0.5 cursor-pointer text-sm hover:bg-zinc-700/50 ${
+        className={`flex items-center gap-1 px-2 py-0.5 cursor-pointer hover:bg-zinc-700/50 ${
           isSelected ? "bg-zinc-700 text-white" : "text-zinc-300"
         }`}
-        style={{ paddingLeft: `${level * 12 + 8}px` }}
+        style={{ paddingLeft: `${level * 12 + 8}px`, fontSize: `${fontSize}px` }}
         onClick={handleClick}
         onContextMenu={(e) => onContextMenu(e, node)}
       >
@@ -141,8 +144,8 @@ function TreeNode({
           {/* New file/folder input */}
           {isCreatingHere && (
             <div
-              className="flex items-center gap-1 px-2 py-0.5 text-sm"
-              style={{ paddingLeft: `${(level + 1) * 12 + 8}px` }}
+              className="flex items-center gap-1 px-2 py-0.5"
+              style={{ paddingLeft: `${(level + 1) * 12 + 8}px`, fontSize: `${fontSize}px` }}
             >
               <span className="w-4" />
               <span>{creatingType === "folder" ? "📁" : "📄"}</span>
@@ -170,6 +173,7 @@ function TreeNode({
               creatingIn={creatingIn}
               creatingType={creatingType}
               creatingValue={creatingValue}
+              zoomLevel={zoomLevel}
               onToggle={onToggle}
               onSelect={onSelect}
               onContextMenu={onContextMenu}
@@ -225,7 +229,7 @@ function getFileIcon(filename: string): string {
 }
 
 export function FileTree() {
-  const { projects, selectedProjectId, selectedFilePath, selectFile } =
+  const { projects, selectedProjectId, selectedFilePath, selectFile, zoomLevel } =
     useAppStore();
 
   const [rootEntries, setRootEntries] = useState<FileEntry[]>([]);
@@ -489,19 +493,30 @@ export function FileTree() {
       });
     }
 
+    // Copy Path is always available
+    actions.push({
+      label: "Copy Path",
+      onClick: () => {
+        navigator.clipboard.writeText(entry.path);
+      },
+    });
+
     return actions;
   }, [selectedProject?.path, startCreate, startRename]);
+
+  const baseFontSize = Math.round(14 * zoomLevel);
+  const smallFontSize = Math.round(12 * zoomLevel);
 
   if (!selectedProject) {
     return (
       <div className="h-full flex flex-col bg-zinc-850 text-zinc-100">
         <div className="p-3 border-b border-zinc-700">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">
+          <h2 className="font-semibold text-zinc-400 uppercase tracking-wide" style={{ fontSize: `${smallFontSize}px` }}>
             Files
           </h2>
         </div>
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-zinc-500 text-sm p-4 text-center">
+          <div className="text-zinc-500 p-4 text-center" style={{ fontSize: `${baseFontSize}px` }}>
             Select a project to view files
           </div>
         </div>
@@ -513,10 +528,10 @@ export function FileTree() {
     <div className="h-full flex flex-col bg-zinc-850 text-zinc-100">
       <div className="p-3 border-b border-zinc-700 flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">
+          <h2 className="font-semibold text-zinc-400 uppercase tracking-wide" style={{ fontSize: `${smallFontSize}px` }}>
             Files
           </h2>
-          <div className="text-xs text-zinc-500 truncate mt-1">
+          <div className="text-zinc-500 truncate mt-1" style={{ fontSize: `${Math.round(11 * zoomLevel)}px` }}>
             {selectedProject.name}
           </div>
         </div>
@@ -547,18 +562,18 @@ export function FileTree() {
         onContextMenu={handleRootContextMenu}
       >
         {loading ? (
-          <div className="p-4 text-zinc-500 text-sm">Loading...</div>
+          <div className="p-4 text-zinc-500" style={{ fontSize: `${baseFontSize}px` }}>Loading...</div>
         ) : error ? (
-          <div className="p-4 text-red-400 text-sm">{error}</div>
+          <div className="p-4 text-red-400" style={{ fontSize: `${baseFontSize}px` }}>{error}</div>
         ) : rootEntries.length === 0 ? (
-          <div className="p-4 text-zinc-500 text-sm">No files found</div>
+          <div className="p-4 text-zinc-500" style={{ fontSize: `${baseFontSize}px` }}>No files found</div>
         ) : (
           <div className="py-1">
             {/* Root-level create input */}
             {creatingIn === selectedProject.path && (
               <div
-                className="flex items-center gap-1 px-2 py-0.5 text-sm"
-                style={{ paddingLeft: "8px" }}
+                className="flex items-center gap-1 px-2 py-0.5"
+                style={{ paddingLeft: "8px", fontSize: `${baseFontSize}px` }}
               >
                 <span className="w-4" />
                 <span>{creatingType === "folder" ? "📁" : "📄"}</span>
@@ -589,6 +604,7 @@ export function FileTree() {
                 creatingIn={creatingIn}
                 creatingType={creatingType}
                 creatingValue={creatingValue}
+                zoomLevel={zoomLevel}
                 onToggle={handleToggle}
                 onSelect={handleSelect}
                 onContextMenu={handleContextMenu}

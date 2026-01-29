@@ -10,9 +10,10 @@ import { useAppStore } from '../stores/appStore';
 import { TaskCard } from './TaskCard';
 import { AddTaskModal } from './AddTaskModal';
 import { EditTaskModal } from './EditTaskModal';
+import { TaskDetailModal } from './TaskDetailModal';
 import { useTasksMdOperations } from '../hooks/useTasksMdOperations';
+import type { TasksMdTask } from '../types';
 import {
-  mapClaudeTasksToKanban,
   mapHumanTasksToKanban,
   mapTasksMdToKanban,
   groupTasksByColumn,
@@ -20,14 +21,13 @@ import {
   COLUMN_ORDER,
   KanbanTask,
 } from '../utils/kanbanMapper';
-import type { KanbanColumn, ClaudeTask, HumanTask } from '../types';
+import type { KanbanColumn, HumanTask } from '../types';
 
 interface KanbanBoardProps {
   projectId: string;
-  tasks: ClaudeTask[];
 }
 
-export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
+export function KanbanBoard({ projectId }: KanbanBoardProps) {
   const {
     kanbanState,
     moveTask,
@@ -35,10 +35,13 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
     deleteHumanTask,
     tasksMdTasks,
     projects,
+    setTasksMdTasks,
+    zoomLevel,
   } = useAppStore();
 
   const [addingToColumn, setAddingToColumn] = useState<KanbanColumn | null>(null);
   const [editingTask, setEditingTask] = useState<KanbanTask | null>(null);
+  const [viewingTask, setViewingTask] = useState<KanbanTask | null>(null);
 
   const projectKanban = kanbanState[projectId] || { taskOverlays: {}, humanTasks: [] };
   const projectTasksMd = tasksMdTasks[projectId] || [];
@@ -47,13 +50,25 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
   // TASKS.md operations
   const { addTask, updateTask, deleteTask } = useTasksMdOperations(project?.path);
 
-  // Map all tasks to Kanban format
+  // Manual refresh of TASKS.md (fallback when watcher doesn't trigger)
+  const refreshTasksMd = async () => {
+    if (!project) return;
+    try {
+      const tasks = await invoke<TasksMdTask[]>('read_tasks_md', {
+        projectPath: project.path,
+      });
+      setTasksMdTasks(projectId, tasks);
+    } catch (err) {
+      console.error('Failed to refresh TASKS.md:', err);
+    }
+  };
+
+  // Map all tasks to Kanban format (TASKS.md only, no Claude ~/.claude/tasks)
   const allTasks = useMemo(() => {
-    const claudeTasks = mapClaudeTasksToKanban(tasks, projectKanban.taskOverlays);
     const humanTasks = mapHumanTasksToKanban(projectKanban.humanTasks);
     const mdTasks = mapTasksMdToKanban(projectTasksMd);
-    return [...claudeTasks, ...humanTasks, ...mdTasks];
-  }, [tasks, projectKanban.taskOverlays, projectKanban.humanTasks, projectTasksMd]);
+    return [...humanTasks, ...mdTasks];
+  }, [projectKanban.humanTasks, projectTasksMd]);
 
   // Group by column
   const columns = useMemo(() => groupTasksByColumn(allTasks), [allTasks]);
@@ -78,17 +93,11 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
           taskSubject,
           newColumn,
         });
-        // The file watcher will update the state automatically
+        // Manually refresh to ensure UI updates (watcher may not trigger immediately)
+        await refreshTasksMd();
       } catch (err) {
         console.error('Failed to move TASKS.md task:', err);
       }
-      return;
-    }
-
-    // Don't allow moving Claude tasks out of their natural state in certain ways
-    // For example, a completed task shouldn't be dragged back to backlog
-    if (!task.isHumanTask && !task.isTasksMdTask && task.originalStatus === 'completed' && newColumn !== 'done') {
-      // Optionally show a warning, but for now just don't move
       return;
     }
 
@@ -183,10 +192,13 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
                 {/* Column header */}
                 <div className="p-3 border-b border-zinc-700/50">
                   <div className="flex items-center justify-between">
-                    <h3 className={`text-sm font-semibold ${getColumnHeaderColorClasses(columnId)}`}>
+                    <h3
+                      className={`font-semibold ${getColumnHeaderColorClasses(columnId)}`}
+                      style={{ fontSize: `${Math.round(14 * zoomLevel)}px` }}
+                    >
                       {config.title}
                     </h3>
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-zinc-500" style={{ fontSize: `${Math.round(12 * zoomLevel)}px` }}>
                       {columnTasks.length}
                     </span>
                   </div>
@@ -217,6 +229,8 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
                               <TaskCard
                                 task={task}
                                 isDragging={snapshot.isDragging}
+                                zoomLevel={zoomLevel}
+                                onClick={() => setViewingTask(task)}
                                 onDelete={
                                   (task.isHumanTask || task.isTasksMdTask)
                                     ? () => handleDeleteTask(task)
@@ -236,7 +250,10 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
 
                       {/* Empty state */}
                       {columnTasks.length === 0 && !snapshot.isDraggingOver && (
-                        <div className="text-xs text-zinc-600 text-center py-4">
+                        <div
+                          className="text-zinc-600 text-center py-4"
+                          style={{ fontSize: `${Math.round(12 * zoomLevel)}px` }}
+                        >
                           No tasks
                         </div>
                       )}
@@ -249,7 +266,8 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
                   <div className="p-2 border-t border-zinc-700/50">
                     <button
                       onClick={() => setAddingToColumn(columnId)}
-                      className="w-full px-2 py-1.5 text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded transition-colors flex items-center justify-center gap-1"
+                      className="w-full px-2 py-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded transition-colors flex items-center justify-center gap-1"
+                      style={{ fontSize: `${Math.round(12 * zoomLevel)}px` }}
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -280,6 +298,30 @@ export function KanbanBoard({ projectId, tasks }: KanbanBoardProps) {
           initialDescription={editingTask.description}
           onSave={handleEditTask}
           onCancel={() => setEditingTask(null)}
+        />
+      )}
+
+      {/* Task detail modal */}
+      {viewingTask && (
+        <TaskDetailModal
+          task={viewingTask}
+          onClose={() => setViewingTask(null)}
+          onEdit={
+            viewingTask.isTasksMdTask
+              ? () => {
+                  setEditingTask(viewingTask);
+                  setViewingTask(null);
+                }
+              : undefined
+          }
+          onDelete={
+            (viewingTask.isHumanTask || viewingTask.isTasksMdTask)
+              ? () => {
+                  handleDeleteTask(viewingTask);
+                  setViewingTask(null);
+                }
+              : undefined
+          }
         />
       )}
     </div>
