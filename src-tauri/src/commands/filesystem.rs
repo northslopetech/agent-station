@@ -29,8 +29,9 @@ const HIDDEN_DIRS: &[&str] = &[
 ];
 
 #[tauri::command]
-pub fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
+pub fn list_directory(path: String, show_hidden: Option<bool>) -> Result<Vec<FileEntry>, String> {
     let path_obj = Path::new(&path);
+    let show_hidden = show_hidden.unwrap_or(false);
 
     if !path_obj.exists() {
         return Err("Path does not exist".to_string());
@@ -52,17 +53,21 @@ pub fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
             .to_string_lossy()
             .to_string();
 
-        // Skip hidden files and filtered directories
-        if name.starts_with('.') && name != ".env" && name != ".env.local" {
-            continue;
+        if !show_hidden {
+            // Skip hidden files and filtered directories
+            if name.starts_with('.') && name != ".env" && name != ".env.local" {
+                continue;
+            }
+
+            let is_directory = entry_path.is_dir();
+
+            // Skip hidden directories
+            if is_directory && HIDDEN_DIRS.contains(&name.as_str()) {
+                continue;
+            }
         }
 
         let is_directory = entry_path.is_dir();
-
-        // Skip hidden directories
-        if is_directory && HIDDEN_DIRS.contains(&name.as_str()) {
-            continue;
-        }
 
         entries.push(FileEntry {
             name,

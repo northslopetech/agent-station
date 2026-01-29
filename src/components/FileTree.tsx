@@ -229,8 +229,13 @@ function getFileIcon(filename: string): string {
 }
 
 export function FileTree() {
-  const { projects, selectedProjectId, selectedFilePath, selectFile, zoomLevel } =
+  const { projects, selectedProjectId, selectedFilePath, selectFile, zoomLevel, projectSettings, updateProjectSettings } =
     useAppStore();
+
+  const selectedProject = projects.find((p) => p.id === selectedProjectId);
+  const showHiddenFiles = selectedProject
+    ? projectSettings[selectedProject.path]?.showHiddenFiles ?? false
+    : false;
 
   const [rootEntries, setRootEntries] = useState<FileEntry[]>([]);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
@@ -256,9 +261,7 @@ export function FileTree() {
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<FileEntry | null>(null);
 
-  const selectedProject = projects.find((p) => p.id === selectedProjectId);
-
-  // Load directory when project changes
+  // Load directory when project changes or showHiddenFiles changes
   useEffect(() => {
     if (!selectedProject) {
       setRootEntries([]);
@@ -266,17 +269,21 @@ export function FileTree() {
     }
 
     loadDirectory(selectedProject.path);
-    // Reset state when project changes
+    // Reset state when project changes (but not when just toggling hidden files)
+  }, [selectedProject?.path, showHiddenFiles]);
+
+  // Reset expanded paths when project changes
+  useEffect(() => {
     setExpandedPaths(new Set());
     setRenamingPath(null);
     setCreatingIn(null);
-  }, [selectedProject]);
+  }, [selectedProject?.id]);
 
   const loadDirectory = async (path: string) => {
     setLoading(true);
     setError(null);
     try {
-      const entries = await invoke<FileEntry[]>("list_directory", { path });
+      const entries = await invoke<FileEntry[]>("list_directory", { path, showHidden: showHiddenFiles });
       setRootEntries(entries);
     } catch (err) {
       setError(String(err));
@@ -288,7 +295,7 @@ export function FileTree() {
 
   const refreshDirectory = useCallback(async (dirPath: string) => {
     try {
-      const children = await invoke<FileEntry[]>("list_directory", { path: dirPath });
+      const children = await invoke<FileEntry[]>("list_directory", { path: dirPath, showHidden: showHiddenFiles });
       if (dirPath === selectedProject?.path) {
         setRootEntries(children);
       } else {
@@ -297,7 +304,7 @@ export function FileTree() {
     } catch (err) {
       console.error("Failed to refresh directory:", err);
     }
-  }, [selectedProject?.path]);
+  }, [selectedProject?.path, showHiddenFiles]);
 
   const handleToggle = useCallback(async (path: string) => {
     setExpandedPaths((prev) => {
@@ -312,12 +319,12 @@ export function FileTree() {
 
     // Load children for the expanded directory
     try {
-      const children = await invoke<FileEntry[]>("list_directory", { path });
+      const children = await invoke<FileEntry[]>("list_directory", { path, showHidden: showHiddenFiles });
       setRootEntries((prev) => updateChildren(prev, path, children));
     } catch (err) {
       console.error("Failed to load directory:", err);
     }
-  }, []);
+  }, [showHiddenFiles]);
 
   const updateChildren = (
     entries: FileEntry[],
@@ -536,6 +543,19 @@ export function FileTree() {
           </div>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => updateProjectSettings(selectedProject.path, { showHiddenFiles: !showHiddenFiles })}
+            className={`w-6 h-6 flex items-center justify-center hover:bg-zinc-700 rounded ${showHiddenFiles ? 'text-blue-400' : 'text-zinc-400 hover:text-zinc-200'}`}
+            title={showHiddenFiles ? "Hide hidden files" : "Show hidden files"}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              {showHiddenFiles ? (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+              )}
+            </svg>
+          </button>
           <button
             onClick={() => startCreate(selectedProject.path, "file")}
             className="w-6 h-6 flex items-center justify-center text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 rounded"
