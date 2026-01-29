@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Project, FileNode, TaskProgress, ClaudeTaskProgress, KanbanColumn, TaskOverlay, HumanTask, TasksMdTask, Settings, ClaudeProcessState } from '../types';
+import type { Project, FileNode, TaskProgress, ClaudeTaskProgress, KanbanColumn, TaskOverlay, HumanTask, TasksMdTask, Settings, ClaudeProcessState, ProjectSettings } from '../types';
 
 interface AppState {
   // Projects
@@ -48,6 +48,9 @@ interface AppState {
   // Claude process state per terminal (terminalId -> state)
   claudeProcessStates: Record<string, ClaudeProcessState>;
 
+  // Per-project settings (projectPath -> settings)
+  projectSettings: Record<string, ProjectSettings>;
+
   // Zoom level (1.0 = 100%, range 0.5-2.0)
   zoomLevel: number;
 
@@ -64,6 +67,7 @@ interface AppState {
 
   setSettings: (settings: Settings) => void;
   updateSettings: (updates: Partial<Settings>) => void;
+  updateProjectSettings: (projectPath: string, updates: Partial<ProjectSettings>) => void;
   setClaudeProcessState: (terminalId: string, state: ClaudeProcessState) => void;
   clearNeedsAttention: (terminalId: string) => void;
   setZoomLevel: (level: number) => void;
@@ -119,6 +123,7 @@ export const useAppStore = create<AppState>()(
         notifyOnlyWhenUnfocused: true,
       },
       claudeProcessStates: {},
+      projectSettings: {},
       zoomLevel: 1.0,
 
       // Project actions
@@ -193,6 +198,17 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           settings: { ...state.settings, ...updates },
           zoomLevel: updates.zoomLevel ?? state.zoomLevel,
+        })),
+
+      updateProjectSettings: (projectPath, updates) =>
+        set((state) => ({
+          projectSettings: {
+            ...state.projectSettings,
+            [projectPath]: {
+              showHiddenFiles: state.projectSettings[projectPath]?.showHiddenFiles ?? false,
+              ...updates,
+            },
+          },
         })),
 
       // Claude process state actions
@@ -411,6 +427,7 @@ export const useAppStore = create<AppState>()(
         kanbanState: state.kanbanState,
         settings: state.settings,
         zoomLevel: state.zoomLevel,
+        projectSettings: state.projectSettings,
       }),
     }
   )

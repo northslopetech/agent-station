@@ -68,6 +68,11 @@ export interface TasksMdTask {
   lineNumber: number;
 }
 
+// Per-project settings (keyed by project path)
+export interface ProjectSettings {
+  showHiddenFiles: boolean;
+}
+
 // Settings types
 export interface Settings {
   autoStartClaude: boolean;
